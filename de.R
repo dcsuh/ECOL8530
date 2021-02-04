@@ -23,21 +23,21 @@ de<-function(t,x,params){
     res<-c(dS,dI,dR,dA,dV)
     list(res)
   })}
-maxTime <- 20.0 # time is in years - run model for this time
-times<-seq(0,maxTime,by=0.01) # how long we run the model for
+maxTime <- 20.0 # time
+times<-seq(0,maxTime,by=0.1) # how often this calculates
 # notes on params
 # beta =       <- contact transmission rate
 # phi =      <- range:0-1 probability infected
 # alpha =     <- recovery rate
 # epsilon =       <- antibody testing rate
-params<-c(beta=0.03,
-          phi=0.1,
-          alpha=6,
-          epsilon=1)  # model parameters
+params<-c(beta=0.0003,
+          phi=0.5,
+          alpha=1/7,
+          epsilon=100)  # model parameters
 
-xstart<-c(S=100,
-          I=1,
-          R=0,
+xstart<-c(S=10^7,
+          I=2000,
+          R=25000,
           A=0,
           V=0)  # initial conditions
 

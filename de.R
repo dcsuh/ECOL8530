@@ -63,10 +63,10 @@ output %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=V,col="Vaccinated"))+
   geom_line(aes(y=X,col="X"))+
   scale_colour_manual(values = c("red","orange","yellow","green","blue","purple","gray","black"))+
-  theme(legend.position = c(0.75,0.5))+
+  theme(legend.position = c(0.75,0.4))+
   labs(y="N",x="Time",col="Population")+
   ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
-  theme(plot.title = element_text(hjust=0, size=10))+
+  theme(plot.title = element_text(hjust=, size=10))+
   geom_hline(yintercept=0.5*10000)
 
 

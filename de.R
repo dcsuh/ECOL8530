@@ -21,7 +21,7 @@ de<-function(t,x,params){
     dE <- beta*S*Ik + beta*S*Iu - upsilon*psi*E - upsilon*(1-psi)*E
     dIk <- upsilon*psi*E - alpha*Ik
     dIu <- upsilon*(1-psi)*E - alpha*Iu
-    dRk <- alpha*Ik + epsilon*phi*Rk
+    dRk <- alpha*Ik + epsilon*phi*Ru
     dRu <- alpha*Iu - epsilon*phi*Ru
     dV <- epsilon*(1-phi)*S
     res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
@@ -43,6 +43,8 @@ params<-c(beta=0.0003,
           upsilon=0.1,
           psi=0.5)  # model parameters
 
+R0 <-(params[1]/params[3]) #calculate R0 with current parameters
+
 xstart<-c(S=10000,
           E=0,
           Ik=1,
@@ -53,6 +55,7 @@ xstart<-c(S=10000,
 
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
 output$X <- output$Rk + output$V
+output$HI_threshold <- (1-1/R0)*xstart[1] #add in herd immunity threshold
 output %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=S,col="Susceptible"))+
   geom_line(aes(y=E,col="Exposed"))+
@@ -67,7 +70,7 @@ output %>% ggplot(.,aes(x=time))+
   labs(y="N",x="Time",col="Population")+
   ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
   theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=0.5*10000)
+  geom_hline(yintercept=output$HI_threshold)
 
 
 de_1<-function(t,x,params){

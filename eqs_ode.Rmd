@@ -5,7 +5,7 @@ date: "2/16/2021"
 output: html_document
 ---
 
-```{r}
+```{r, echo=F}
 library(tidyverse)
 library(magrittr)
 library(deSolve)
@@ -27,6 +27,7 @@ $$
  \frac{dV}{dt} &= \epsilon (1-\phi) S\\ \\
 \end{aligned}
 $$
+Parameters
 
 $$
 \begin{align*}
@@ -55,7 +56,7 @@ de<-function(t,x,params){
     dE <- beta*S*Ik + beta*S*Iu - upsilon*psi*E - upsilon*(1-psi)*E
     dIk <- upsilon*psi*E - alpha*Ik
     dIu <- upsilon*(1-psi)*E - alpha*Iu
-    dRk <- alpha*Ik + epsilon*phi*Rk
+    dRk <- alpha*Ik + epsilon*phi*Ru
     dRu <- alpha*Iu - epsilon*phi*Ru
     dV <- epsilon*(1-phi)*S
     res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
@@ -69,7 +70,7 @@ times<-seq(0,maxTime,by=0.1) # how often this calculates
 # alpha =     <- recovery rate
 # epsilon =   <- antibody testing rate
 # upsilon =   <- infected testing rate
-# psi =       <- range: 0-1 probability infected
+# psi =       <- range: 0-1 test effectiveness
 params<-c(beta=0.0003,
           phi=0.5,
           alpha=1/7,
@@ -86,8 +87,15 @@ xstart<-c(S=10000,
           V=0)  # initial conditions
 ```
 
-use deSolve to create output and then plot output
+simulation with antibody assistance
 ```{r}
+params<-c(beta=0.0003,
+          phi=0.5,
+          alpha=1/7,
+          epsilon=0.1, 
+          upsilon=0.1,
+          psi=0.5)
+
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
 output$X <- output$Rk + output$V
 output %>% ggplot(.,aes(x=time))+
@@ -107,3 +115,30 @@ output %>% ggplot(.,aes(x=time))+
   geom_hline(yintercept=0.5*10000)
 ```
 
+when phi = 0, epsilon becomes the vaccinating rate. if comparing between antibody-assist or not then epsilon should be set as the product of epsilon and (1-phi) values from the antibody-assist simulation. 
+```{r}
+params<-c(beta=0.0003,
+          phi=0,
+          alpha=1/7,
+          epsilon=0.05,
+          upsilon=0.1,
+          psi=0.5)
+
+output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+output$X <- output$Rk + output$V
+output %>% ggplot(.,aes(x=time))+
+  geom_line(aes(y=S,col="Susceptible"))+
+  geom_line(aes(y=E,col="Exposed"))+
+  geom_line(aes(y=Ik,col="Infected_k"))+
+  geom_line(aes(y=Iu,col="Infected_u"))+
+  geom_line(aes(y=Rk,col="Recovered_k"))+
+  geom_line(aes(y=Ru,col="Recovered_u"))+
+  geom_line(aes(y=V,col="Vaccinated"))+
+  geom_line(aes(y=X,col="X"))+
+  scale_colour_manual(values = c("red","orange","yellow","green","blue","purple","gray","black"))+
+  theme(legend.position = c(0.75,0.4))+
+  labs(y="N",x="Time",col="Population")+
+  ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
+  theme(plot.title = element_text(hjust=, size=10))+
+  geom_hline(yintercept=0.5*10000)
+```

@@ -1,0 +1,109 @@
+---
+title: "eqs_ode"
+author: "Daniel Suh"
+date: "2/16/2021"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(deSolve)
+library(here)
+```
+
+![compartmental diagram](concept.png)
+
+Equations
+
+$$
+\begin{aligned}
+ \frac{dS}{dt} &= -\beta S I_k - \beta S I_u - \epsilon (1-\phi) S \\ \\
+ \frac{dE}{dt} &=  \beta S I_k + \beta S I_u - \upsilon (\psi) E - \upsilon (1-\psi) E\\ \\
+ \frac{dI_k}{dt} &= \upsilon (\psi) E - \alpha I_k \\ \\
+ \frac{dI_u}{dt} &= \upsilon (1-\psi) E - \alpha I_u \\ \\
+ \frac{dR_k}{dt} &= \alpha I_k + \epsilon \phi R_u\\ \\
+ \frac{dR_u}{dt} &= \alpha I_u - \epsilon \phi R_u\\ \\
+ \frac{dV}{dt} &= \epsilon (1-\phi) S\\ \\
+\end{aligned}
+$$
+
+$$
+\begin{align*}
+ & \beta = transmission\ rate\\ \\ 
+ & \phi = probability\ seropositive\\ \\ 
+ & \alpha = recovery\ rate\\ \\
+ & \epsilon = antibody\ testing\ rate\\ \\
+ & \upsilon = vaccination\ rate\\ \\
+ & \psi = probability\ infected\\ \\
+\end{align*}
+$$
+
+ODE
+Define functions and variables for deSolve
+```{r}
+de<-function(t,x,params){
+  S <- x[1]
+  E <- x[2]
+  Ik <- x[3]
+  Iu <- x[4]
+  Rk <- x[5]
+  Ru <- x[6]
+  V <- x[7]
+  with(as.list(params),{
+    dS <- -beta*S*Ik - beta*S*Iu - epsilon*(1-phi)*S
+    dE <- beta*S*Ik + beta*S*Iu - upsilon*psi*E - upsilon*(1-psi)*E
+    dIk <- upsilon*psi*E - alpha*Ik
+    dIu <- upsilon*(1-psi)*E - alpha*Iu
+    dRk <- alpha*Ik + epsilon*phi*Rk
+    dRu <- alpha*Iu - epsilon*phi*Ru
+    dV <- epsilon*(1-phi)*S
+    res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
+    list(res)
+  })}
+maxTime <- 100.0 # time
+times<-seq(0,maxTime,by=0.1) # how often this calculates
+# notes on params
+# beta =      <- contact transmission rate
+# phi =       <- range:0-1 probability seropositive
+# alpha =     <- recovery rate
+# epsilon =   <- antibody testing rate
+# upsilon =   <- infected testing rate
+# psi =       <- range: 0-1 probability infected
+params<-c(beta=0.0003,
+          phi=0.5,
+          alpha=1/7,
+          epsilon=0.1,
+          upsilon=0.1,
+          psi=0.5)  # model parameters
+
+xstart<-c(S=10000,
+          E=0,
+          Ik=1,
+          Iu=0,
+          Rk=0,
+          Ru=0,
+          V=0)  # initial conditions
+```
+
+use deSolve to create output and then plot output
+```{r}
+output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+output$X <- output$Rk + output$V
+output %>% ggplot(.,aes(x=time))+
+  geom_line(aes(y=S,col="Susceptible"))+
+  geom_line(aes(y=E,col="Exposed"))+
+  geom_line(aes(y=Ik,col="Infected_k"))+
+  geom_line(aes(y=Iu,col="Infected_u"))+
+  geom_line(aes(y=Rk,col="Recovered_k"))+
+  geom_line(aes(y=Ru,col="Recovered_u"))+
+  geom_line(aes(y=V,col="Vaccinated"))+
+  geom_line(aes(y=X,col="X"))+
+  scale_colour_manual(values = c("red","orange","yellow","green","blue","purple","gray","black"))+
+  theme(legend.position = c(0.75,0.4))+
+  labs(y="N",x="Time",col="Population")+
+  ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
+  theme(plot.title = element_text(hjust=, size=10))+
+  geom_hline(yintercept=0.5*10000)
+```
+

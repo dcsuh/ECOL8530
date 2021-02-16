@@ -52,13 +52,13 @@ de<-function(t,x,params){
   Ru <- x[6]
   V <- x[7]
   with(as.list(params),{
-    dS <- -beta*S*Ik - beta*S*Iu - epsilon*(1-phi)*S
+    dS <- -beta*S*Ik - beta*S*Iu - epsilon*tau*(1-phi)*S
     dE <- beta*S*Ik + beta*S*Iu - upsilon*psi*E - upsilon*(1-psi)*E
     dIk <- upsilon*psi*E - alpha*Ik
     dIu <- upsilon*(1-psi)*E - alpha*Iu
-    dRk <- alpha*Ik + epsilon*phi*Ru
-    dRu <- alpha*Iu - epsilon*phi*Ru
-    dV <- epsilon*(1-phi)*S
+    dRk <- alpha*Ik + epsilon*tau*phi*Ru
+    dRu <- alpha*Iu - epsilon*tau*phi*Ru - epsilon*(1-tau)*phi*Ru
+    dV <- epsilon*tau*(1-phi)*S + epsilon*(1-tau)*phi*Ru
     res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
     list(res)
   })}
@@ -70,12 +70,14 @@ times<-seq(0,maxTime,by=0.1) # how often this calculates
 # alpha =     <- recovery rate
 # epsilon =   <- antibody testing rate
 # upsilon =   <- infected testing rate
+# tau =       <- range: 0-1 antibody testing reliability
 # psi =       <- range: 0-1 test effectiveness
 params<-c(beta=0.0003,
           phi=0.5,
           alpha=1/7,
           epsilon=0.1,
           upsilon=0.1,
+          tau=1,
           psi=0.5)  # model parameters
 
 xstart<-c(S=10000,
@@ -94,6 +96,7 @@ params<-c(beta=0.0003,
           alpha=1/7,
           epsilon=0.1, 
           upsilon=0.1,
+          tau=1,
           psi=0.5)
 
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
@@ -112,7 +115,7 @@ output %>% ggplot(.,aes(x=time))+
   labs(y="N",x="Time",col="Population")+
   ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
   theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=0.5*10000)
+  geom_hline(yintercept=0.75*10000)
 ```
 
 when phi = 0, epsilon becomes the vaccinating rate. if comparing between antibody-assist or not then epsilon should be set as the product of epsilon and (1-phi) values from the antibody-assist simulation. 
@@ -122,6 +125,7 @@ params<-c(beta=0.0003,
           alpha=1/7,
           epsilon=0.05,
           upsilon=0.1,
+          tau=1,
           psi=0.5)
 
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
@@ -140,5 +144,5 @@ output %>% ggplot(.,aes(x=time))+
   labs(y="N",x="Time",col="Population")+
   ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
   theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=0.5*10000)
+  geom_hline(yintercept=0.75*10000)
 ```

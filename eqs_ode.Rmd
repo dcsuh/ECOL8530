@@ -18,13 +18,13 @@ Equations
 
 $$
 \begin{aligned}
- \frac{dS}{dt} &= -\beta S I_k - \beta S I_u - \epsilon (1-\phi) S \\ \\
+ \frac{dS}{dt} &= -\beta S I_k - \beta S I_u - \epsilon \tau (1-\phi) S \\ \\
  \frac{dE}{dt} &=  \beta S I_k + \beta S I_u - \upsilon (\psi) E - \upsilon (1-\psi) E\\ \\
  \frac{dI_k}{dt} &= \upsilon (\psi) E - \alpha I_k \\ \\
  \frac{dI_u}{dt} &= \upsilon (1-\psi) E - \alpha I_u \\ \\
- \frac{dR_k}{dt} &= \alpha I_k + \epsilon \phi R_u\\ \\
- \frac{dR_u}{dt} &= \alpha I_u - \epsilon \phi R_u\\ \\
- \frac{dV}{dt} &= \epsilon (1-\phi) S\\ \\
+ \frac{dR_k}{dt} &= \alpha I_k + \epsilon \tau \phi R_u\\ \\
+ \frac{dR_u}{dt} &= \alpha I_u - \epsilon \tau \phi R_u - \epsilon (1-\tau) \phi R_u\\ \\
+ \frac{dV}{dt} &= \epsilon \tau (1-\phi) S + \epsilon (1-\tau) \phi R_u\\ \\
 \end{aligned}
 $$
 Parameters
@@ -35,8 +35,9 @@ $$
  & \phi = probability\ seropositive\\ \\ 
  & \alpha = recovery\ rate\\ \\
  & \epsilon = antibody\ testing\ rate\\ \\
- & \upsilon = vaccination\ rate\\ \\
- & \psi = probability\ infected\\ \\
+ & \upsilon = infected\ testing\ rate\\ \\
+ & \psi = COVID19\ testing\ reliability\\ \\
+ & \tau = antibody\ testing\ reliability\\ \\
 \end{align*}
 $$
 
@@ -52,13 +53,13 @@ de<-function(t,x,params){
   Ru <- x[6]
   V <- x[7]
   with(as.list(params),{
-    dS <- -beta*S*Ik - beta*S*Iu - epsilon*tau*(1-phi)*S
+    dS <- -beta*S*Ik - beta*S*Iu - epsilon*tau*S
     dE <- beta*S*Ik + beta*S*Iu - upsilon*psi*E - upsilon*(1-psi)*E
     dIk <- upsilon*psi*E - alpha*Ik
     dIu <- upsilon*(1-psi)*E - alpha*Iu
     dRk <- alpha*Ik + epsilon*tau*phi*Ru
     dRu <- alpha*Iu - epsilon*tau*phi*Ru - epsilon*(1-tau)*phi*Ru
-    dV <- epsilon*tau*(1-phi)*S + epsilon*(1-tau)*phi*Ru
+    dV <- epsilon*tau*S + epsilon*(1-tau)*phi*Ru
     res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
     list(res)
   })}
@@ -70,8 +71,9 @@ times<-seq(0,maxTime,by=0.1) # how often this calculates
 # alpha =     <- recovery rate
 # epsilon =   <- antibody testing rate
 # upsilon =   <- infected testing rate
-# tau =       <- range: 0-1 antibody testing reliability
+# tau =       <- range: 0-1 false negative antibody test rate
 # psi =       <- range: 0-1 test effectiveness
+# zeta =      <- range: 0-1 false positive antibody test rate?
 params<-c(beta=0.0003,
           phi=0.5,
           alpha=1/7,
@@ -117,7 +119,7 @@ output %>% ggplot(.,aes(x=time))+
   scale_colour_manual(values = c("red","orange","yellow","green","blue","purple","gray","black"))+
   theme(legend.position = c(0.75,0.4))+
   labs(y="N",x="Time",col="Population")+
-  ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
+  ggtitle("Transmission Dynamics for Antibody-Assisted Vaccinations")+
   theme(plot.title = element_text(hjust=, size=10))+
   geom_hline(yintercept=0.75*10000)
 ```
@@ -147,7 +149,7 @@ output %>% ggplot(.,aes(x=time))+
   scale_colour_manual(values = c("red","orange","yellow","green","blue","purple","gray","black"))+
   theme(legend.position = c(0.75,0.4))+
   labs(y="N",x="Time",col="Population")+
-  ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
+  ggtitle("Transmission Dynamics for Vaccinations without antibody tests")+
   theme(plot.title = element_text(hjust=, size=10))+
   geom_hline(yintercept=0.75*10000)
 ```

@@ -54,6 +54,7 @@ xstart<-c(S=10000,
           V=0)  # initial conditions
 
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+output %<>% rowwise() %>% mutate(total = sum(c(S,E,Ik,Iu,Rk,Ru,V)))
 output$X <- output$Rk + output$V
 output$HI_threshold <- (1-1/R0)*xstart[1] #add in herd immunity threshold
 output %>% ggplot(.,aes(x=time))+

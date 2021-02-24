@@ -18,13 +18,13 @@ Equations
 
 $$
 \begin{aligned}
- \frac{dS}{dt} &= -\beta S I_k - \beta S I_u - \epsilon \tau (1-\phi) S \\ \\
- \frac{dE}{dt} &=  \beta S I_k + \beta S I_u - \upsilon (\psi) E - \upsilon (1-\psi) E\\ \\
- \frac{dI_k}{dt} &= \upsilon (\psi) E - \alpha I_k \\ \\
- \frac{dI_u}{dt} &= \upsilon (1-\psi) E - \alpha I_u \\ \\
- \frac{dR_k}{dt} &= \alpha I_k + \epsilon \tau \phi R_u\\ \\
- \frac{dR_u}{dt} &= \alpha I_u - \epsilon \tau \phi R_u - \epsilon (1-\tau) \phi R_u\\ \\
- \frac{dV}{dt} &= \epsilon \tau (1-\phi) S + \epsilon (1-\tau) \phi R_u\\ \\
+ \frac{dS}{dt} &= -\beta S I_k - \beta S I_u - \phi \gamma - (1-\phi) \gamma (S/U) \\ \\
+ \frac{dE}{dt} &=  \beta S I_k + \beta S I_u - \psi \theta E - (1-\psi) \theta E - (1-\phi) \gamma (E/U) \\ \\
+ \frac{dI_k}{dt} &= \psi \theta E - \alpha I_k \\ \\
+ \frac{dI_u}{dt} &= (1-\psi) \theta E - \alpha I_u - (1-\phi) \gamma (Iu/U) \\ \\
+ \frac{dR_k}{dt} &= \alpha I_k \\ \\
+ \frac{dR_u}{dt} &= \alpha I_u - (1-\phi) \gamma (Ru/U) \\ \\
+ \frac{dV}{dt} &= \gamma \\ \\
 \end{aligned}
 $$
 Parameters
@@ -35,16 +35,15 @@ $$
  & \phi = probability\ seropositive\\ \\ 
  & \alpha = recovery\ rate\\ \\
  & \epsilon = antibody\ testing\ rate\\ \\
- & \upsilon = infected\ testing\ rate\\ \\
- & \psi = COVID19\ testing\ reliability\\ \\
- & \tau = antibody\ testing\ reliability\\ \\
+ & \upsilon = vaccination\ rate\\ \\
+ & \psi = probability\ infected\\ \\
 \end{align*}
 $$
 
 ODE
 Define functions and variables for deSolve
 ```{r}
-de<-function(t,x,params){
+e<-function(t,x,params){
   S <- x[1]
   E <- x[2]
   Ik <- x[3]
@@ -53,13 +52,13 @@ de<-function(t,x,params){
   Ru <- x[6]
   V <- x[7]
   with(as.list(params),{
-    dS <- -beta*S*Ik - beta*S*Iu - epsilon*tau*S
-    dE <- beta*S*Ik + beta*S*Iu - upsilon*psi*E - upsilon*(1-psi)*E
-    dIk <- upsilon*psi*E - alpha*Ik
-    dIu <- upsilon*(1-psi)*E - alpha*Iu
-    dRk <- alpha*Ik + epsilon*tau*phi*Ru
-    dRu <- alpha*Iu - epsilon*tau*phi*Ru - epsilon*(1-tau)*phi*Ru
-    dV <- epsilon*tau*S + epsilon*(1-tau)*phi*Ru
+    dS <- -beta*S*Ik - beta*S*Iu - phi*gamma - (1-phi)*gamma*(S/(S+E+Iu+Ru))
+    dE <- beta*S*Ik + beta*S*Iu - psi*theta*E - (1-psi)*theta*E - (1-phi)*gamma*(E/(S+E+Iu+Ru))
+    dIk <- psi*theta*E - alpha*Ik
+    dIu <- (1-psi)*theta*E - alpha*Iu - (1-phi)*gamma*(Iu/(S+E+Iu+Ru))
+    dRk <- alpha*Ik
+    dRu <- alpha*Iu - (1-phi)*gamma*(Ru/(S+E+Iu+Ru))
+    dV <- gamma
     res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
     list(res)
   })}
@@ -67,45 +66,42 @@ maxTime <- 100.0 # time
 times<-seq(0,maxTime,by=0.1) # how often this calculates
 # notes on params
 # beta =      <- contact transmission rate
-# phi =       <- range:0-1 probability seropositive
+# phi =       <- range:0-1 proportion vaccines targeted to known susceptible individuals
+# psi =       <- range: 0-1 probability infected individuals are identified
 # alpha =     <- recovery rate
-# epsilon =   <- antibody testing rate
-# upsilon =   <- infected testing rate
-# tau =       <- range: 0-1 false negative antibody test rate
-# psi =       <- range: 0-1 test effectiveness
-# zeta =      <- range: 0-1 false positive antibody test rate?
-params<-c(beta=0.0003,
-          phi=0.5,
-          alpha=1/7,
-          epsilon=0.1,
-          upsilon=0.1,
-          tau=1,
-          psi=0.5)  # model parameters
+# gamma =     <- number of daily vaccines
 
-xstart<-c(S=10000,
-          E=0,
-          Ik=1,
-          Iu=0,
-          Rk=0,
-          Ru=0,
+params<-c(beta=0.000003,
+          phi=1,
+          psi=0.3,
+          theta=1/5,
+          alpha=1/7,
+          gamma=10000)  # model parameters
+
+R0 <-(params[1]/params[3]) #calculate R0 with current parameters
+
+xstart<-c(S=500000,
+          E=2500,
+          Ik=2500,
+          Iu=5000,
+          Rk=10000,
+          Ru=30000,
           V=0)  # initial conditions
 ```
 
 simulation with antibody assistance
 ```{r}
-params<-c(beta=0.0003,
-          phi=0.5,
+params<-c(beta=0.000003,
+          phi=1,
+          psi=0.3,
+          theta=1/5,
           alpha=1/7,
-          epsilon=0.1, 
-          upsilon=0.1,
-          tau=1,
-          psi=0.5)
+          gamma=10000)  # model parameters
 
 
 R0 <-(params[1]/params[3]) #calculate R0 with current parameters
 
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
-output %<>% rowwise() %>% mutate(total = sum(c(S,E,Ik,Iu,Rk,Ru,V)))
 output$X <- output$Rk + output$V
 output$HI_threshold <- (1-1/R0)*xstart[1] #add in herd immunity threshold
 output %>% ggplot(.,aes(x=time))+
@@ -117,23 +113,23 @@ output %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=Ru,col="Recovered_u"))+
   geom_line(aes(y=V,col="Vaccinated"))+
   geom_line(aes(y=X,col="X"))+
-  scale_colour_manual(values = c("red","orange","yellow","green","blue","purple","gray","black"))+
+  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
   theme(legend.position = c(0.75,0.4))+
   labs(y="N",x="Time",col="Population")+
-  ggtitle("Transmission Dynamics for Antibody-Assisted Vaccinations")+
+  ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
   theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=0.75*10000)
+  geom_hline(yintercept=2*10^5)+
+  xlim(0,20)+ylim(0,500000)
 ```
 
-when phi = 0, epsilon becomes the vaccinating rate. if comparing between antibody-assist or not then epsilon should be set as the product of epsilon and (1-phi) values from the antibody-assist simulation. 
+when phi = 0, vaccinations are distributed to anyone who is not known to be recovered or infectious. 
 ```{r}
-params<-c(beta=0.0003,
+params<-c(beta=0.000003,
           phi=0,
+          psi=0.3,
+          theta=1/5,
           alpha=1/7,
-          epsilon=0.05,
-          upsilon=0.1,
-          tau=1,
-          psi=0.5)
+          gamma=10000)  # model parameters
 
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
 output$X <- output$Rk + output$V
@@ -147,10 +143,11 @@ output %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=Ru,col="Recovered_u"))+
   geom_line(aes(y=V,col="Vaccinated"))+
   geom_line(aes(y=X,col="X"))+
-  scale_colour_manual(values = c("red","orange","yellow","green","blue","purple","gray","black"))+
+  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
   theme(legend.position = c(0.75,0.4))+
   labs(y="N",x="Time",col="Population")+
-  ggtitle("Transmission Dynamics for Vaccinations without antibody tests")+
+  ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
   theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=0.75*10000)
+  geom_hline(yintercept=2*10^5)+
+  xlim(0,20)+ylim(0,500000)
 ```

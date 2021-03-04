@@ -152,3 +152,40 @@ output %>% ggplot(.,aes(x=time))+
   geom_hline(yintercept=2*10^5)+
   xlim(0,20)+ylim(0,500000)
 ```
+
+
+```{r}
+#Grid search through parameters
+
+data <- expand.grid(prop = seq(0,1,0.25), 
+                   inc = seq(0,1,0.25),
+                   reco = seq(0,1,0.25),
+                   mort1 = seq(0.5,2,0.5),
+                   trans1 = seq(1,2,0.5),
+                   trans2 = seq(1,2,0.5),
+                   mort2 = seq(1,2,1),
+                   birth = seq(1,2,1))
+
+
+mat <- matrix(1:9, nrow = 3, ncol = 3)
+
+
+m <- nrow(data)
+
+for(n in 1:m){
+  mat[1] = 0
+  mat[2] = (data$trans1[n]*data$birth[n])/(data$mort1[n]*(data$inc[n]+data$mort1[n]))
+  mat[3] = (data$trans2[n]*data$birth[n])/(data$mort1[n]*(data$inc[n]+data$mort1[n]))
+  mat[4] = (data$prop[n]*data$inc[n])/(data$reco[n]+data$mort2[n])
+  mat[5] = 0
+  mat[6] = 0
+  mat[7] = ((1-data$prop[n])*data$inc[n])/(data$reco[n]+data$mort2[n])
+  mat[8] = 0
+  mat[9] = 0
+  eigen <- max(eigen(mat)$values)
+  data$eigen[n] <- eigen
+}
+
+
+
+```

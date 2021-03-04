@@ -157,14 +157,14 @@ output %>% ggplot(.,aes(x=time))+
 ```{r}
 #Grid search through parameters
 
-data <- expand.grid(prop = seq(0,1,0.25), 
-                   inc = seq(0,1,0.25),
-                   reco = seq(0,1,0.25),
-                   mort1 = seq(0.5,2,0.5),
+data <- expand.grid(prop = seq(0,1,0.1), 
+                   inc = seq(1,1,0.25),
+                   reco = seq(1,1,0.25),
+                   mort1 = seq(2,2,0.5),
                    trans1 = seq(1,2,0.5),
                    trans2 = seq(1,2,0.5),
-                   mort2 = seq(1,2,1),
-                   birth = seq(1,2,1))
+                   mort2 = seq(1,1,1),
+                   birth = seq(1,1,1))
 
 
 mat <- matrix(1:9, nrow = 3, ncol = 3)
@@ -186,6 +186,13 @@ for(n in 1:m){
   data$eigen[n] <- eigen
 }
 
+data$trans3 <- data$trans1/data$trans2
+
+data %>% ggplot(aes(x=prop,y=trans3,fill=eigen))+geom_tile()+scale_fill_viridis_c(direction=-1)
+
+#when prop is high, most infected individuals are in the Ik category
+#trans1 is beta for Ik
+#So if prop is high and trans3 is high then that should be the highest R0 because most individuals are Ik and Ik has higher beta in this case
 
 
 ```

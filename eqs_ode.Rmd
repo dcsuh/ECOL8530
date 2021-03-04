@@ -158,11 +158,11 @@ output %>% ggplot(.,aes(x=time))+
 #Grid search through parameters
 
 data <- expand.grid(prop = seq(0,1,0.1), 
-                   inc = seq(1,1,0.25),
-                   reco = seq(1,1,0.25),
-                   mort1 = seq(2,2,0.5),
-                   trans1 = seq(1,2,0.5),
-                   trans2 = seq(1,2,0.5),
+                   inc = seq(1,1,0.1),
+                   reco = seq(1,1,0.1),
+                   mort1 = seq(2,4,0.5),
+                   trans1 = seq(1,4,0.5),
+                   trans2 = seq(1,4,0.5),
                    mort2 = seq(1,1,1),
                    birth = seq(1,1,1))
 

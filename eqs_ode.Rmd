@@ -10,6 +10,7 @@ library(tidyverse)
 library(magrittr)
 library(deSolve)
 library(here)
+library(ggnewscale)
 ```
 
 ![compartmental diagram](concept.png)
@@ -18,13 +19,13 @@ Equations
 
 $$
 \begin{aligned}
- \frac{dS}{dt} &= -\beta S I_k - \beta S I_u - \phi \gamma - (1-\phi) \gamma (S/U) \\ \\
- \frac{dE}{dt} &=  \beta S I_k + \beta S I_u - \psi \theta E - (1-\psi) \theta E - (1-\phi) \gamma (E/U) \\ \\
- \frac{dI_k}{dt} &= \psi \theta E - \alpha I_k \\ \\
- \frac{dI_u}{dt} &= (1-\psi) \theta E - \alpha I_u - (1-\phi) \gamma (Iu/U) \\ \\
- \frac{dR_k}{dt} &= \alpha I_k \\ \\
- \frac{dR_u}{dt} &= \alpha I_u - (1-\phi) \gamma (Ru/U) \\ \\
- \frac{dV}{dt} &= \gamma \\ \\
+ \frac{dS}{dt} &= -\beta_1 S I_k - \beta_2 S I_u - \phi \gamma - (1-\phi) \gamma (S/U) + \lambda - \mu S\\ \\
+ \frac{dE}{dt} &=  \beta_1 S I_k + \beta_2 S I_u - \psi \theta E - (1-\psi) \theta E - (1-\phi) \gamma (E/U) - \mu E\\ \\
+ \frac{dI_k}{dt} &= \psi \theta E - \alpha I_k - \mu I_k\\ \\
+ \frac{dI_u}{dt} &= (1-\psi) \theta E - \alpha I_u - (1-\phi) \gamma (Iu/U) - \mu I_u\\ \\
+ \frac{dR_k}{dt} &= \alpha I_k - \mu R_k\\ \\
+ \frac{dR_u}{dt} &= \alpha I_u - (1-\phi) \gamma (Ru/U) - \mu R_u\\ \\
+ \frac{dV}{dt} &= \gamma - \mu V\\ \\
 \end{aligned}
 $$
 Parameters
@@ -32,26 +33,28 @@ Parameters
 $$
 \begin{align*}
  & U = unknown\ immunity\ status\\ \\
+ & \lambda = growth\ rate\\ \\
+ & \mu = per\ capita\ mortality\ rate\\ \\
  & \beta = transmission\ rate\\ \\ 
- & \phi = probability\ seropositive\\ \\ 
+ & \phi = antibody\ testing\ proportion\\ \\ 
+ & \theta = incubation\ period\\ \\
  & \alpha = recovery\ rate\\ \\
- & \epsilon = antibody\ testing\ rate\\ \\
- & \upsilon = vaccination\ rate\\ \\
- & \psi = probability\ infected\\ \\
+ & \psi = detected\ cases\ proportion\\ \\
+ & \psi = daily\ vaccinations\\ \\
 \end{align*}
 $$
 
 ```{r}
 #Grid search through parameters
 
-data <- expand.grid(prop = seq(0,1,0.1), 
+data <- expand.grid(prop = seq(0,1,0.1), #proportion individuals in known infected class
                    inc = seq(1/8,1/4,0.03),
                    reco = seq(1/8,1/4,0.03),
-                   mort1 = seq(1/100,1/100,0.5),
+                   mort1 = seq(1/10,1/10,0.5),
+                   mort2 = seq(1/10,1/10,1),
                    trans1 = seq(0.001,0.07,0.01),
                    trans2 = seq(0.001,0.07,0.01),
-                   mort2 = seq(1/100,1/100,1),
-                   birth = seq(10,10,1))
+                   birth = seq(5,5,1))
 
 
 mat <- matrix(1:9, nrow = 3, ncol = 3)
@@ -98,13 +101,13 @@ de<-function(t,x,params){
   Ru <- x[6]
   V <- x[7]
   with(as.list(params),{
-    dS <- -beta*S*Ik - beta*S*Iu - phi*gamma - (1-phi)*gamma*(S/(S+E+Iu+Ru))
-    dE <- beta*S*Ik + beta*S*Iu - psi*theta*E - (1-psi)*theta*E - (1-phi)*gamma*(E/(S+E+Iu+Ru))
-    dIk <- psi*theta*E - alpha*Ik
-    dIu <- (1-psi)*theta*E - alpha*Iu - (1-phi)*gamma*(Iu/(S+E+Iu+Ru))
-    dRk <- alpha*Ik
-    dRu <- alpha*Iu - (1-phi)*gamma*(Ru/(S+E+Iu+Ru))
-    dV <- gamma
+    dS <- -beta1*S*Ik - beta2*S*Iu - phi*gamma - (1-phi)*gamma*(S/(S+E+Iu+Ru)) + lambda - mu*S
+    dE <- beta1*S*Ik + beta2*S*Iu - psi*theta*E - (1-psi)*theta*E - (1-phi)*gamma*(E/(S+E+Iu+Ru)) - mu*E
+    dIk <- psi*theta*E - alpha*Ik - mu1*Ik
+    dIu <- (1-psi)*theta*E - alpha*Iu - (1-phi)*gamma*(Iu/(S+E+Iu+Ru)) - mu1*Iu
+    dRk <- alpha*Ik - mu*Rk
+    dRu <- alpha*Iu - (1-phi)*gamma*(Ru/(S+E+Iu+Ru)) - mu*Ru
+    dV <- gamma - mu*V
     res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
     list(res)
   })}
@@ -112,27 +115,71 @@ maxTime <- 100.0 # time
 times<-seq(0,maxTime,by=0.1) # how often this calculates
 # notes on params
 # beta =      <- contact transmission rate
-# phi =       <- range:0-1 proportion vaccines targeted to known susceptible individuals
+# lambda =    <- constant growth rate
+# mu =        <- density-dependent mortality rate
+# phi =       <- range: 0-1 proportion vaccines targeted to known susceptible individuals
 # psi =       <- range: 0-1 probability infected individuals are identified
 # alpha =     <- recovery rate
 # gamma =     <- number of daily vaccines
 
-params<-c(beta=0.000003,
-          phi=1,
+params<-c(beta1=0.000003,
+          beta2=0.0003,
+          lambda=1/2,
+          mu=1/10,
+          mu1=1/5,
+          phi=0.5,
           psi=0.3,
           theta=1/5,
           alpha=1/7,
           gamma=10000)  # model parameters
 
-R0 <-(params[1]/params[3]) #calculate R0 with current parameters
-
 xstart<-c(S=500000,
           E=2500,
-          Ik=2500,
-          Iu=5000,
+          Ik=1,
+          Iu=1,
           Rk=10000,
           Ru=30000,
           V=0)  # initial conditions
+```
+
+
+
+```{r, include=F}
+R0_list <- c(1.5,2,2.5)
+final <- list()
+for (i in 1:length(R0_list)){
+  R0 <- R0_list[i]
+  threshold <- (1-1/R0)*as.numeric(xstart[1])
+  phi <- c(0:100)
+  time <- c(0)
+  herd <- tibble(phi, time, .rows = 101)
+  for (j in 0:100){
+    params<-c(beta1=0.0000003,
+            beta2=0.0000003,
+            lambda=5,
+            mu=1/1000,
+            mu1=1/10,
+            phi=j/100,
+            psi=0.01,
+            theta=1/5,
+            alpha=1/7,
+            gamma=5000) 
+    output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+    output$herd <- output$S<=threshold
+    tmp <- output %>% filter(herd==1)
+    herd$time[j+1] <- tmp$time[1]
+  }
+  final[[i]] <- herd
+}
+```
+
+
+```{r}
+ggplot() + geom_line(data = final[[1]],aes(x=final[[1]]$phi, y=final[[1]]$time), color="red") +
+  geom_line(data = final[[2]],aes(x=final[[2]]$phi, y=final[[2]]$time),color="green") +
+  geom_line(data = final[[2]],aes(x=final[[3]]$phi, y=final[[3]]$time),color="blue") + 
+  xlab("phi") + ylab("time")
+
 ```
 
 simulation with antibody assistance
@@ -149,7 +196,6 @@ R0 <-(params[1]/params[3]) #calculate R0 with current parameters
 
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
 output$X <- output$Rk + output$V
-output$HI_threshold <- (1-1/R0)*xstart[1] #add in herd immunity threshold
 output %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=S,col="Susceptible"))+
   geom_line(aes(y=E,col="Exposed"))+

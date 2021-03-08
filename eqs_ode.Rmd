@@ -11,6 +11,7 @@ library(magrittr)
 library(deSolve)
 library(here)
 library(ggnewscale)
+library(patchwork)
 ```
 
 ![compartmental diagram](concept.png)
@@ -171,16 +172,89 @@ for (i in 1:length(R0_list)){
   }
   final[[i]] <- herd
 }
-```
 
-
-```{r}
-ggplot() + geom_line(data = final[[1]],aes(x=final[[1]]$phi, y=final[[1]]$time), color="red") +
+plot1 <- ggplot() + geom_line(data = final[[1]],aes(x=final[[1]]$phi, y=final[[1]]$time), color="red") +
   geom_line(data = final[[2]],aes(x=final[[2]]$phi, y=final[[2]]$time),color="green") +
   geom_line(data = final[[2]],aes(x=final[[3]]$phi, y=final[[3]]$time),color="blue") + 
   xlab("phi") + ylab("time")
 
 ```
+
+```{r, include=F}
+R0_list <- c(1.5,2,2.5)
+final <- list()
+for (i in 1:length(R0_list)){
+  R0 <- R0_list[i]
+  threshold <- (1-1/R0)*as.numeric(xstart[1])
+  phi <- c(0:100)
+  time <- c(0)
+  herd <- tibble(phi, time, .rows = 101)
+  for (j in 0:100){
+    params<-c(beta1=0.0000003,
+            beta2=0.0000003,
+            lambda=5,
+            mu=1/1000,
+            mu1=1/10,
+            phi=j/100,
+            psi=0.5,
+            theta=1/5,
+            alpha=1/7,
+            gamma=5000) 
+    output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+    output$herd <- output$S<=threshold
+    tmp <- output %>% filter(herd==1)
+    herd$time[j+1] <- tmp$time[1]
+  }
+  final[[i]] <- herd
+}
+
+plot2 <- ggplot() + geom_line(data = final[[1]],aes(x=final[[1]]$phi, y=final[[1]]$time), color="red") +
+  geom_line(data = final[[2]],aes(x=final[[2]]$phi, y=final[[2]]$time),color="green") +
+  geom_line(data = final[[2]],aes(x=final[[3]]$phi, y=final[[3]]$time),color="blue") + 
+  xlab("phi") + ylab("time")
+
+```
+
+```{r, include=F}
+R0_list <- c(1.5,2,2.5)
+final <- list()
+for (i in 1:length(R0_list)){
+  R0 <- R0_list[i]
+  threshold <- (1-1/R0)*as.numeric(xstart[1])
+  phi <- c(0:100)
+  time <- c(0)
+  herd <- tibble(phi, time, .rows = 101)
+  for (j in 0:100){
+    params<-c(beta1=0.0000003,
+            beta2=0.0000003,
+            lambda=5,
+            mu=1/1000,
+            mu1=1/10,
+            phi=j/100,
+            psi=0.8,
+            theta=1/5,
+            alpha=1/7,
+            gamma=5000) 
+    output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+    output$herd <- output$S<=threshold
+    tmp <- output %>% filter(herd==1)
+    herd$time[j+1] <- tmp$time[1]
+  }
+  final[[i]] <- herd
+}
+
+plot3 <- ggplot() + geom_line(data = final[[1]],aes(x=final[[1]]$phi, y=final[[1]]$time), color="red") +
+  geom_line(data = final[[2]],aes(x=final[[2]]$phi, y=final[[2]]$time),color="green") +
+  geom_line(data = final[[2]],aes(x=final[[3]]$phi, y=final[[3]]$time),color="blue") + 
+  xlab("phi") + ylab("time")
+
+```
+
+```{r}
+final_plot <- plot1|plot2|plot3
+final_plot
+```
+
 
 simulation with antibody assistance
 ```{r}

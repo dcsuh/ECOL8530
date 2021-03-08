@@ -49,12 +49,12 @@ $$
 #Grid search through parameters
 
 data <- expand.grid(prop = seq(0,1,0.1), #proportion individuals in known infected class
-                   inc = seq(1/8,1/4,0.03),
-                   reco = seq(1/8,1/4,0.03),
-                   mort1 = seq(1/10,1/10,0.5),
+                   inc = seq(1/5,1/5,0.03),
+                   reco = seq(1/7,1/5,0.03),
+                   mort1 = seq(1/1000,1/1000,0.5),
                    mort2 = seq(1/10,1/10,1),
-                   trans1 = seq(0.001,0.07,0.01),
-                   trans2 = seq(0.001,0.07,0.01),
+                   trans1 = seq(0.00003,0.0003,0.00003),
+                   trans2 = seq(0.00003,0.0003,0.00003),
                    birth = seq(5,5,1))
 
 
@@ -79,7 +79,7 @@ for(n in 1:m){
 
 data$trans3 <- data$trans1/data$trans2
 
-data %>% ggplot(aes(x=prop,y=trans3,fill=eigen))+geom_tile()+scale_fill_viridis_c(direction=-1)
+data %>% ggplot(aes(x=prop,y=trans3,color=eigen))+geom_point()+scale_color_viridis_c(direction=-1)
 
 #when prop is high, most infected individuals are in the Ik category
 #trans1 is beta for Ik
@@ -159,8 +159,8 @@ for (i in 1:length(psi_list)){
     time <- c(0)
     herd <- tibble(phi, time, .rows = 101)
     for (k in 0:100){
-      params<-c(beta1=0.0000003,
-              beta2=0.000003,
+      params<-c(beta1=0.00003,
+              beta2=0.0003,
               lambda=5,
               mu=1/1000,
               mu1=1/10,

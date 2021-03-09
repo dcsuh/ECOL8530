@@ -26,12 +26,13 @@ de<-function(t,x,params){
     res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
     list(res)
   })}
-maxTime <- 20.0 # time
-times<-seq(0,maxTime,by=0.5) # how often this calculates
+maxTime <- 100.0 # time
+times<-seq(0,maxTime,by=1) # how often this calculates
 # notes on params
 # beta =      <- contact transmission rate
 # lambda =    <- constant growth rate
 # mu =        <- density-dependent mortality rate
+# theta =     <- incubation period
 # phi =       <- range: 0-1 proportion vaccines targeted to known susceptible individuals
 # psi =       <- range: 0-1 probability infected individuals are identified
 # alpha =     <- recovery rate
@@ -62,10 +63,10 @@ set.seed(8878896)
 lhs <- maximinLHS(h,10)
 
 
-beta1.min=0.00000003
-beta1.max=0.0000003
-beta2.min=0.00000003
-beta2.max=0.0000003
+beta1.min=0.00003
+beta1.max=0.0003
+beta2.min=0.00003
+beta2.max=0.0003
 lambda.min=5
 lambda.max=20
 mu.min=1/1000
@@ -81,7 +82,7 @@ theta.max=1/4
 alpha.min=1/7
 alpha.max=1/14
 gamma.min=10000
-gamma.max=50000
+gamma.max=100000
 
 
 params.set <- cbind(
@@ -97,36 +98,86 @@ params.set <- cbind(
   gamma = lhs[,9]*(gamma.max-gamma.min)+gamma.min)
 
 
+# levels <- 11
+# 
+# h2 <- 250
+# 
+# R0 <- 2
+# threshold <- (1-1/R0)*as.numeric(xstart[1])
+# antibody.prop <- seq(0,1,0.1)
+# j <- 1  
+# data <- data.frame(matrix(rep(NA,levels*h2*11),nrow=levels*h2))
+# #technically, this loop may need to calculate R0 within it since R0 and the threshold will change with the parameters
+# #this can be done but I need to get that matrix to work
+# 
+# for(i in 1:h2){
+#   for (k in 1:length(antibody.prop)){
+#     
+#     data[j,1:10] <- params <- as.list(c(params.set[i,], phi=antibody.prop[k]))
+#     output <- as.data.frame(ode(xstart, times, de, params))
+#     output$herd <- output$S<=threshold
+#     tmp <- output %>% filter(herd==1)
+#     data[j,11] <- tmp$time[1]
+#     j <- j+1
+#     
+#   }
+# }
+# 
+# names(data) <- c(names(params),'threshold.time')
+# 
+# data %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_boxplot(notch = T) + geom_jitter()
+# 
+# 
+# bonferroni.alpha = 0.05/10
+# prcc <- pcc(data[,1:9], data[,11], nboot=1000, rank=T, conf=1-bonferroni.alpha)
+# print(prcc)
+
+
+############################ calculating R0 for each sim
+
+
+
 levels <- 11
 
-h2 <- 1000
+h2 <- 250
 
-R0 <- 2
-threshold <- (1-1/R0)*as.numeric(xstart[1])
 antibody.prop <- seq(0,1,0.1)
 j <- 1  
 data <- data.frame(matrix(rep(NA,levels*h2*11),nrow=levels*h2))
-#technically, this loop may need to calculate R0 within it since R0 and the threshold will change with the parameters
-#this can be done but I need to get that matrix to work
 
 for(i in 1:h2){
   for (k in 1:length(antibody.prop)){
     
     data[j,1:10] <- params <- as.list(c(params.set[i,], phi=antibody.prop[k]))
+      mat <- matrix(1:9, nrow = 3, ncol = 3)
+      mat[1] = 0
+      mat[2] = (params$beta1)*(params$lambda/params$mu)*(1/(params$theta+params$mu))
+      mat[3] = (params$beta2)*(params$lambda/params$mu)*(1/(params$theta+params$mu))
+      mat[4] = (params$psi*params$theta)/(params$alpha+params$mu1)
+      mat[5] = 0
+      mat[6] = 0
+      mat[7] = ((1-params$psi)*params$theta)/(params$alpha+params$mu1)
+      mat[8] = 0
+      mat[9] = 0
+      R0 <- max(eigen(mat)$values)
+      threshold <- (1-1/R0)*as.numeric(xstart[1])
     output <- as.data.frame(ode(xstart, times, de, params))
     output$herd <- output$S<=threshold
     tmp <- output %>% filter(herd==1)
-    data[j,11] <- tmp$time[1]
+    data[j,11] <- R0
+    data[j,12] <- tmp$time[1]
     j <- j+1
     
   }
 }
 
-names(data) <- c(names(params),'threshold.time')
+names(data) <- c(names(params),'R0','threshold.time')
 
-data %>% mutate(psi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_boxplot(notch = T)
+data %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_boxplot()
+
+data %>% filter(threshold.time>1) %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_point()
 
 
 bonferroni.alpha = 0.05/10
-prcc <- pcc(data[,1:9], data[,11], nboot=1000, rank=T, conf=1-bonferroni.alpha)
+prcc <- pcc(data[,1:9], data[,12], nboot=1000, rank=T, conf=1-bonferroni.alpha)
 print(prcc)

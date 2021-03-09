@@ -45,7 +45,7 @@ $$
 \end{align*}
 $$
 
-```{r, include=F}
+```{r, eval=F}
 #Grid search through parameters
 
 data <- expand.grid(prop = seq(0,1,0.1), #proportion individuals in known infected class

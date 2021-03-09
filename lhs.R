@@ -26,8 +26,8 @@ de<-function(t,x,params){
     res<-c(dS,dE,dIk,dIu,dRk,dRu,dV)
     list(res)
   })}
-maxTime <- 50.0 # time
-times<-seq(0,maxTime,by=1) # how often this calculates
+maxTime <- 20.0 # time
+times<-seq(0,maxTime,by=0.5) # how often this calculates
 # notes on params
 # beta =      <- contact transmission rate
 # lambda =    <- constant growth rate
@@ -98,7 +98,7 @@ params.set <- cbind(
 
 levels <- 11
 
-h2 <- 250
+h2 <- 1000
 
 R0 <- 2
 threshold <- (1-1/R0)*as.numeric(xstart[1])
@@ -119,6 +119,9 @@ for(i in 1:h2){
 }
 
 names(data) <- c(names(params),'herd.threshold')
+
+data %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=herd.threshold)) + geom_boxplot(notch = T)
+
 
 bonferroni.alpha = 0.05/10
 prcc <- pcc(data[,1:9], data[,11], nboot=1000, rank=T, conf=1-bonferroni.alpha)

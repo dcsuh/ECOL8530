@@ -105,6 +105,9 @@ threshold <- (1-1/R0)*as.numeric(xstart[1])
 antibody.prop <- seq(0,1,0.1)
 j <- 1  
 data <- data.frame(matrix(rep(NA,levels*h2*11),nrow=levels*h2))
+#technically, this loop may need to calculate R0 within it since R0 and the threshold will change with the parameters
+#this can be done but I need to get that matrix to work
+
 for(i in 1:h2){
   for (k in 1:length(antibody.prop)){
     
@@ -118,9 +121,9 @@ for(i in 1:h2){
   }
 }
 
-names(data) <- c(names(params),'herd.threshold')
+names(data) <- c(names(params),'threshold.time')
 
-data %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=herd.threshold)) + geom_boxplot(notch = T)
+data %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_boxplot(notch = T)
 
 
 bonferroni.alpha = 0.05/10

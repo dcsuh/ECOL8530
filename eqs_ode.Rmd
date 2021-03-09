@@ -5,7 +5,7 @@ date: "2/16/2021"
 output: html_document
 ---
 
-```{r, echo=F}
+```{r, eval=F}
 library(tidyverse)
 library(magrittr)
 library(deSolve)

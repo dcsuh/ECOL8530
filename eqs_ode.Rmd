@@ -49,13 +49,13 @@ $$
 #Grid search through parameters
 
 data <- expand.grid(prop = seq(0,1,0.1), #proportion individuals in known infected class
-                   inc = seq(1/5,1/5,0.03),
-                   reco = seq(1/7,1/5,0.03),
-                   mort1 = seq(1/1000,1/1000,0.5),
-                   mort2 = seq(1/10,1/10,1),
+                   inc = seq(1/7,1/4,(1/4-1/7)/4),
+                   reco = seq(1/9,1/5,(1/5-1/9/4)),
+                   mort1 = seq(1/(78.5*365),1/(78.5*365),0.5),
+                   mort2 = seq(1/(77.5*365),1/(77.5*365),1/1000),
                    trans1 = seq(0.00003,0.0003,0.00003),
                    trans2 = seq(0.00003,0.0003,0.00003),
-                   birth = seq(5,5,1))
+                   birth = seq(3924000,3924000,5))
 
 
 mat <- matrix(1:9, nrow = 3, ncol = 3)
@@ -88,7 +88,49 @@ data %>% ggplot(aes(x=prop,y=trans3,color=eigen))+geom_point()+scale_color_virid
 
 ```
 
+```{r}
+#Grid search through parameters
 
+data <- expand.grid(prop = seq(0,1,0.1), #proportion individuals in known infected class
+                   inc = 1/5,
+                   reco = 1/7,
+                   mort1 = 1/1000,
+                   mort2 = 1/100,
+                   trans1 = 0.00003,
+                   trans2 = 0.00003,
+                   birth = 20)
+
+
+mat <- matrix(1:9, nrow = 3, ncol = 3)
+
+data %>% add_column(dfe = (data$lambda/data$mort1))
+
+m <- nrow(data)
+
+for(n in 1:m){
+  mat[1] = 0
+  mat[2] = (data$trans1[n])*(data$dfe[n])*(1/(data$inc[n]+data$mort1[n]))
+  mat[3] = (data$trans2[n])*(data$dfe[n])*(1/(data$inc[n]+data$mort1[n]))
+  mat[4] = (data$prop[n]*data$inc[n])/(data$reco[n]+data$mort2[n])
+  mat[5] = 0
+  mat[6] = 0
+  mat[7] = ((1-data$prop[n])*data$inc[n])/(data$reco[n]+data$mort2[n])
+  mat[8] = 0
+  mat[9] = 0
+  eigen <- max(eigen(mat)$values)
+  data$eigen[n] <- eigen
+}
+
+data$trans3 <- data$trans1/data$trans2
+
+data %>% ggplot(aes(x=prop,y=trans3,color=eigen))+geom_point()+scale_color_viridis_c(direction=-1)
+
+#when prop is high, most infected individuals are in the Ik category
+#trans1 is beta for Ik
+#So if prop is high and trans3 is high then that should be the highest R0 because most individuals are Ik and Ik has higher beta in this case
+
+
+```
 
 ODE
 Define functions and variables for deSolve
@@ -124,7 +166,7 @@ times<-seq(0,maxTime,by=0.1) # how often this calculates
 # gamma =     <- number of daily vaccines
 
 params<-c(beta1=0.000003,
-          beta2=0.0003,
+          beta2=0.00003,
           lambda=1/2,
           mu=1/10,
           mu1=1/5,
@@ -134,13 +176,21 @@ params<-c(beta1=0.000003,
           alpha=1/7,
           gamma=10000)  # model parameters
 
-xstart<-c(S=500000,
-          E=2500,
-          Ik=1,
-          Iu=1,
-          Rk=100,
-          Ru=30000,
+xstart<-c(S=5*10^6,
+          E=1.6*10^5,
+          Ik=1.3*10^5,
+          Iu=4.9*10^5,
+          Rk=6.6*10^5,
+          Ru=2.7*10^6,
           V=0)  # initial conditions
+
+# xstart<-c(S=175*10^6,
+#           E=4.6*10^6,
+#           Ik=3*10^6,
+#           Iu=11.2*10^6,
+#           Rk=22*10^6,
+#           Ru=83*10^6,
+#           V=0)  # initial conditions
 ```
 
 
@@ -155,23 +205,24 @@ for (i in 1:length(psi_list)){
   for (j in 1:length(R0_list)){
     R0 <- R0_list[j]
     threshold <- (1-1/R0)*as.numeric(xstart[1])
-    phi <- c(0:100)
+    phi <- c(0)
     time <- c(0)
     herd <- tibble(phi, time, .rows = 101)
     for (k in 0:100){
-      params<-c(beta1=0.00003,
-              beta2=0.0003,
-              lambda=5,
-              mu=1/1000,
-              mu1=1/10,
-              phi=k/100,
-              psi=psi/100,
-              theta=1/5,
-              alpha=1/7,
-              gamma=5000) 
+      params<-c(beta1=0.0000003,
+                beta2=0.00000003,
+                lambda=20,
+                mu=1/1000,
+                mu1=1/100,
+                phi=k/100,
+                psi=psi/100,
+                theta=1/5,
+                alpha=1/7,
+                gamma=1*10^6) 
       output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
       output$herd <- output$S<=threshold
       tmp <- output %>% filter(herd==1)
+      herd$phi[k+1] <- as.numeric(params[6])
       herd$time[k+1] <- tmp$time[1]
     }
     R0_lines[[j]] <- herd
@@ -185,23 +236,55 @@ for (i in 1:length(psi_list)){
 plot1 <- ggplot() + geom_line(data = final[[1]][[1]],aes(x=phi, y=time), color="red") +
   geom_line(data = final[[1]][[2]],aes(x=phi, y=time),color="forestgreen") +
   geom_line(data = final[[1]][[3]],aes(x=phi, y=time),color="blue") + 
-  xlab("phi") + ylab("time") +ylim(c(10,70)) + labs(title = "80% symptomatic") +
-  theme(axis.title.x = element_blank())
+  xlab("phi") + ylab("time") + labs(title = "80% symptomatic") +
+  theme(axis.title.x = element_blank()) + ylim(0,10)
 
 plot2 <- ggplot() + geom_line(data = final[[2]][[1]],aes(x=phi, y=time), color="red") +
   geom_line(data = final[[2]][[2]],aes(x=phi, y=time),color="forestgreen") +
   geom_line(data = final[[2]][[3]],aes(x=phi, y=time),color="blue") + 
-  xlab("phi") + ylab("time") +ylim(c(10,70)) + labs(title = "50% symptomatic") + 
-  theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y=element_blank())
+  xlab("phi") + ylab("time") + labs(title = "50% symptomatic") + 
+  theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y=element_blank()) + ylim(0,10)
 
 plot3 <- ggplot() + geom_line(data = final[[3]][[1]],aes(x=phi, y=time), color="red") +
   geom_line(data = final[[3]][[2]],aes(x=phi, y=time),color="forestgreen") +
   geom_line(data = final[[3]][[3]],aes(x=phi, y=time),color="blue") + 
-  xlab("phi") + ylab("time") +ylim(c(10,70)) + labs(title = "20% symptomatic") + 
-  theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y=element_blank(), axis.title.x = element_blank())
+  xlab("phi") + ylab("time") + labs(title = "20% symptomatic") + 
+  theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y=element_blank(), axis.title.x = element_blank()) + ylim(0,10)
 
 final_plot <- plot1|plot2|plot3
 final_plot
+```
+
+```{r}
+params<-c(beta1=0.00000003,
+        beta2=0.00000003,
+        lambda=20,
+        mu=1/1000,
+        mu1=1/100,
+        phi=50/100,
+        psi=50/100,
+        theta=1/5,
+        alpha=1/7,
+        gamma=50000) 
+R0 <- 2.5
+threshold <- (1-1/R0)*as.numeric(xstart[1])
+output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+
+output %>% ggplot(.,aes(x=time))+
+  geom_line(aes(y=S,col="Susceptible"))+
+  geom_line(aes(y=E,col="Exposed"))+
+  geom_line(aes(y=Ik,col="Infected_k"))+
+  geom_line(aes(y=Iu,col="Infected_u"))+
+  geom_line(aes(y=Rk,col="Recovered_k"))+
+  geom_line(aes(y=Ru,col="Recovered_u"))+
+  geom_line(aes(y=V,col="Vaccinated"))+
+  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
+  #theme(legend.position = c(0.75,0.4))+
+  labs(y="N",x="Time",col="Population")+
+  #ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
+  theme(plot.title = element_text(hjust=, size=10))+
+  geom_hline(yintercept=threshold)+
+  xlim(0,100)+ylim(0,as.numeric(xstart[1]))
 ```
 
 

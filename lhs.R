@@ -91,6 +91,7 @@ params.set <- cbind(
   mu = lhs[,4]*(mu.max-mu.min)+mu.min,
   mu1 = lhs[,5]*(mu1.max-mu1.min)+mu1.min,
   psi = lhs[,6]*(psi.max-psi.min)+psi.min,
+#  phi = lhs[,6]*(phi.max-phi.min)+phi.min,
   theta = lhs[,7]*(theta.max-theta.min)+theta.min,
   alpha = lhs[,8]*(alpha.max-alpha.min)+alpha.min,
   gamma = lhs[,9]*(gamma.max-gamma.min)+gamma.min)
@@ -123,7 +124,7 @@ for(i in 1:h2){
 
 names(data) <- c(names(params),'threshold.time')
 
-data %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_boxplot(notch = T)
+data %>% mutate(psi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_boxplot(notch = T)
 
 
 bonferroni.alpha = 0.05/10

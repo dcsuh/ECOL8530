@@ -5,27 +5,51 @@ date: "2/16/2021"
 output: html_document
 ---
 
-```{r, eval=F}
+```{r, include=F}
 library(tidyverse)
 library(magrittr)
 library(deSolve)
 library(here)
 library(ggnewscale)
 library(patchwork)
+library(lhs)
+library(sensitivity)
 ```
+
+Table of Contents
+1. Conceptual Diagram
+2. Equations w/0 vaccination
+3. Equations w/ vaccination
+4. Parameters
+5. Parameter selection
+6. Simulations for R0 and herd immunity threshold
+7. Latin Hypercube Sampling
+8. Partial Rank Correlation Coefficients
+
 
 ![compartmental diagram](concept.png)
 
 Equations
-
+w/o vaccinations
+$$
+\begin{aligned}
+ \frac{dS}{dt} &= -\beta_1 S I_k - \beta_2 S I_u + \lambda - \mu S\\ \\
+ \frac{dE}{dt} &=  \beta_1 S I_k + \beta_2 S I_u - \psi \theta E - (1-\psi) \theta E - \mu E\\ \\
+ \frac{dI_k}{dt} &= \psi \theta E - \alpha I_k - \mu I_k\\ \\
+ \frac{dI_u}{dt} &= (1-\psi) \theta E - \alpha I_u - \mu I_u\\ \\
+ \frac{dR_k}{dt} &= \alpha I_k - \mu R_k\\ \\
+ \frac{dR_u}{dt} &= \alpha I_u - \mu R_u\\ \\
+\end{aligned}
+$$
+w/ vaccinations
 $$
 \begin{aligned}
  \frac{dS}{dt} &= -\beta_1 S I_k - \beta_2 S I_u - \phi \gamma - (1-\phi) \gamma (S/U) + \lambda - \mu S\\ \\
  \frac{dE}{dt} &=  \beta_1 S I_k + \beta_2 S I_u - \psi \theta E - (1-\psi) \theta E - (1-\phi) \gamma (E/U) - \mu E\\ \\
  \frac{dI_k}{dt} &= \psi \theta E - \alpha I_k - \mu I_k\\ \\
- \frac{dI_u}{dt} &= (1-\psi) \theta E - \alpha I_u - (1-\phi) \gamma (Iu/U) - \mu I_u\\ \\
+ \frac{dI_u}{dt} &= (1-\psi) \theta E - \alpha I_u - (1-\phi) \gamma (I_u/U) - \mu I_u\\ \\
  \frac{dR_k}{dt} &= \alpha I_k - \mu R_k\\ \\
- \frac{dR_u}{dt} &= \alpha I_u - (1-\phi) \gamma (Ru/U) - \mu R_u\\ \\
+ \frac{dR_u}{dt} &= \alpha I_u - (1-\phi) \gamma (R_u/U) - \mu R_u\\ \\
  \frac{dV}{dt} &= \gamma - \mu V\\ \\
 \end{aligned}
 $$
@@ -33,97 +57,60 @@ Parameters
 
 $$
 \begin{align*}
- & U = unknown\ immunity\ status\\ \\
- & \lambda = growth\ rate\\ \\
+ & U = unknown\ immunity\ status:\ S+E+I_u+R_u\\ \\
+ & \lambda = constant\ birth\ rate\\ \\
  & \mu = per\ capita\ mortality\ rate\\ \\
  & \beta = transmission\ rate\\ \\ 
- & \phi = antibody\ testing\ proportion\\ \\ 
+ & \phi = antibody\ testing\ strength:\ 0-1\\ \\ 
  & \theta = incubation\ period\\ \\
  & \alpha = recovery\ rate\\ \\
- & \psi = detected\ cases\ proportion\\ \\
+ & \psi = COVID\ testing\ strength:\ 0-1\\ \\
  & \gamma = daily\ vaccinations\\ \\
 \end{align*}
 $$
 
-```{r, eval=F}
+
+Grid Search Through Parameters
+```{r, }
 #Grid search through parameters
 
-data <- expand.grid(prop = seq(0,1,0.1), #proportion individuals in known infected class
-                   inc = seq(1/7,1/4,(1/4-1/7)/4),
-                   reco = seq(1/9,1/5,(1/5-1/9/4)),
-                   mort1 = seq(1/(78.5*365),1/(78.5*365),0.5),
-                   mort2 = seq(1/(77.5*365),1/(77.5*365),1/1000),
-                   trans1 = seq(0.00003,0.0003,0.00003),
-                   trans2 = seq(0.00003,0.0003,0.00003),
-                   birth = seq(3924000,3924000,5))
+x<-c(-1:-13)
+
+data <- expand.grid(psi = c(0.1,0.9), #proportion individuals in known infected class
+                   theta = c(1/5,1/6), #incubation period
+                   alpha = c(1/7,1/8), #recovery period
+                   mu = c(1/(365*78)), #per capita mortality rate for uninfected
+                   mu1 = c(1/365*77), #per capita mortality rate for infected
+                   beta1 = c(3*10^x), #transmission rate for symptomatic
+                   beta2 = c(3*10^x), #transmission rate for asymptomatic
+                   lambda = c(64109589)) #constant birth rate
 
 
 mat <- matrix(1:9, nrow = 3, ncol = 3)
 
+data %<>% add_column(dfe = (data$lambda/data$mu))
 
 m <- nrow(data)
 
 for(n in 1:m){
   mat[1] = 0
-  mat[2] = (data$trans1[n]*data$birth[n])/(data$mort1[n]*(data$inc[n]+data$mort1[n]))
-  mat[3] = (data$trans2[n]*data$birth[n])/(data$mort1[n]*(data$inc[n]+data$mort1[n]))
-  mat[4] = (data$prop[n]*data$inc[n])/(data$reco[n]+data$mort2[n])
+  mat[2] = ((data$beta1[n])*(data$dfe[n]))/(data$theta[n]+data$mu[n])
+  mat[3] = ((data$beta2[n])*(data$dfe[n]))/(data$theta[n]+data$mu[n])
+  mat[4] = (data$psi[n]*data$theta[n])/(data$alpha[n]+data$mu1[n])
   mat[5] = 0
   mat[6] = 0
-  mat[7] = ((1-data$prop[n])*data$inc[n])/(data$reco[n]+data$mort2[n])
+  mat[7] = ((1-data$psi[n])*data$theta[n])/(data$alpha[n]+data$mu1[n])
   mat[8] = 0
   mat[9] = 0
   eigen <- max(eigen(mat)$values)
   data$eigen[n] <- eigen
 }
 
-data$trans3 <- data$trans1/data$trans2
-
-data %>% ggplot(aes(x=prop,y=trans3,color=eigen))+geom_point()+scale_color_viridis_c(direction=-1)
-
-#when prop is high, most infected individuals are in the Ik category
-#trans1 is beta for Ik
-#So if prop is high and trans3 is high then that should be the highest R0 because most individuals are Ik and Ik has higher beta in this case
+data$herd <- (1-(1/data$eigen))*300000000
+#View(data %>% filter(eigen<20))
 
 
-```
-
-```{r, eval=F}
-#Grid search through parameters
-
-data <- expand.grid(prop = seq(0,1,0.1), #proportion individuals in known infected class
-                   inc = 1/5,
-                   reco = 1/7,
-                   mort1 = 1/1000,
-                   mort2 = 1/100,
-                   trans1 = 0.00003,
-                   trans2 = 0.00003,
-                   birth = 20)
-
-
-mat <- matrix(1:9, nrow = 3, ncol = 3)
-
-data %>% add_column(dfe = (data$lambda/data$mort1))
-
-m <- nrow(data)
-
-for(n in 1:m){
-  mat[1] = 0
-  mat[2] = (data$trans1[n])*(data$dfe[n])*(1/(data$inc[n]+data$mort1[n]))
-  mat[3] = (data$trans2[n])*(data$dfe[n])*(1/(data$inc[n]+data$mort1[n]))
-  mat[4] = (data$prop[n]*data$inc[n])/(data$reco[n]+data$mort2[n])
-  mat[5] = 0
-  mat[6] = 0
-  mat[7] = ((1-data$prop[n])*data$inc[n])/(data$reco[n]+data$mort2[n])
-  mat[8] = 0
-  mat[9] = 0
-  eigen <- max(eigen(mat)$values)
-  data$eigen[n] <- eigen
-}
-
-data$trans3 <- data$trans1/data$trans2
-
-data %>% ggplot(aes(x=prop,y=trans3,color=eigen))+geom_point()+scale_color_viridis_c(direction=-1)
+#data %>% ggplot(aes(x=prop,y=trans3,color=eigen))+geom_point()+scale_color_viridis_c(direction=-1)
 
 #when prop is high, most infected individuals are in the Ik category
 #trans1 is beta for Ik
@@ -134,7 +121,7 @@ data %>% ggplot(aes(x=prop,y=trans3,color=eigen))+geom_point()+scale_color_virid
 
 ODE
 Define functions and variables for deSolve
-```{r, eval=F}
+```{r, }
 de<-function(t,x,params){
   S <- x[1]
   E <- x[2]
@@ -162,6 +149,7 @@ times<-seq(0,maxTime,by=0.1) # how often this calculates
 # mu =        <- density-dependent mortality rate
 # phi =       <- range: 0-1 proportion vaccines targeted to known susceptible individuals
 # psi =       <- range: 0-1 probability infected individuals are identified
+# theta =      <- incubation period
 # alpha =     <- recovery rate
 # gamma =     <- number of daily vaccines
 
@@ -176,26 +164,28 @@ params<-c(beta1=0.000003,
           alpha=1/7,
           gamma=10000)  # model parameters
 
-xstart<-c(S=5*10^6,
-          E=1.6*10^5,
-          Ik=1.3*10^5,
-          Iu=4.9*10^5,
-          Rk=6.6*10^5,
-          Ru=2.7*10^6,
-          V=0)  # initial conditions
-
-# xstart<-c(S=175*10^6,
-#           E=4.6*10^6,
-#           Ik=3*10^6,
-#           Iu=11.2*10^6,
-#           Rk=22*10^6,
-#           Ru=83*10^6,
+#Georgia Pop Size
+# xstart<-c(S=5*10^6,
+#           E=1.6*10^5,
+#           Ik=1.3*10^5,
+#           Iu=4.9*10^5,
+#           Rk=6.6*10^5,
+#           Ru=2.7*10^6,
 #           V=0)  # initial conditions
+
+#US Pop Size
+xstart<-c(S=175*10^6,
+          E=4.6*10^6,
+          Ik=3*10^6,
+          Iu=11.2*10^6,
+          Rk=22*10^6,
+          Ru=83*10^6,
+          V=0)  # initial conditions
 ```
 
+Select reasonable parameters w/ intended R0 > substitute params into for loop > simulate over range of phi
 
-
-```{r, eval=F}
+```{r, }
 psi_list <- c(80,50,20)
 R0_list <- c(1.5,2,2.5)
 final <- list()
@@ -207,14 +197,14 @@ for (i in 1:length(psi_list)){
     threshold <- (1-1/R0)*as.numeric(xstart[1])
     phi <- c(0)
     time <- c(0)
-    herd <- tibble(phi, time, .rows = 101)
-    for (k in 0:100){
+    herd <- tibble(phi, time, .rows = 11)
+    for (k in 0:10){
       params<-c(beta1=0.0000003,
                 beta2=0.00000003,
                 lambda=20,
                 mu=1/1000,
                 mu1=1/100,
-                phi=k/100,
+                phi=k*10/100,
                 psi=psi/100,
                 theta=1/5,
                 alpha=1/7,
@@ -232,7 +222,7 @@ for (i in 1:length(psi_list)){
 ```
 
 
-```{r, eval=F}
+```{r, }
 plot1 <- ggplot() + geom_line(data = final[[1]][[1]],aes(x=phi, y=time), color="red") +
   geom_line(data = final[[1]][[2]],aes(x=phi, y=time),color="forestgreen") +
   geom_line(data = final[[1]][[3]],aes(x=phi, y=time),color="blue") + 
@@ -255,7 +245,9 @@ final_plot <- plot1|plot2|plot3
 final_plot
 ```
 
-```{r, eval=F}
+Plots for transmission Dynamics
+
+```{r, }
 params<-c(beta1=0.00000003,
         beta2=0.00000003,
         lambda=20,
@@ -288,7 +280,7 @@ output %>% ggplot(.,aes(x=time))+
 ```
 
 
-```{r, eval=F}
+```{r, }
 params<-c(beta1=0.0000003,#transmission rate for known infecteds
         beta2=0.000003,#transmission rate for unknown infecteds
         lambda=5,
@@ -319,158 +311,91 @@ output %>% ggplot(.,aes(x=time))+
   xlim(0,100)+ylim(0,500000)
 ```
 
+```{r}
+h <- 1000
+set.seed(8878896)
+lhs <- maximinLHS(h,10)
 
-```{r, eval=F}
-params<-c(beta1=0.0000003,#transmission rate for known infecteds
-        beta2=0.000003,#transmission rate for unknown infecteds
-        lambda=5,
-        mu=1/1000,
-        mu1=1/10,
-        phi=10/100,#proportion vaccines going to confirmed susceptibles
-        psi=20/100,#proportion of infecteds in known category
-        theta=1,
-        alpha=1/7,
-        gamma=2500)   # model parameters
 
-output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+beta1.min=0.00003
+beta1.max=0.0003
+beta2.min=0.00003
+beta2.max=0.0003
+lambda.min=5
+lambda.max=20
+mu.min=1/1000
+mu.max=1/100
+mu1.min=1/100
+mu1.max=1/10
+phi.min=0
+phi.max=1
+psi.min=0
+psi.max=1
+theta.min=1/7
+theta.max=1/4
+alpha.min=1/7
+alpha.max=1/14
+gamma.min=10000
+gamma.max=100000
 
-output %>% ggplot(.,aes(x=time))+
-  geom_line(aes(y=S,col="Susceptible"))+
-  geom_line(aes(y=E,col="Exposed"))+
-  geom_line(aes(y=Ik,col="Infected_k"))+
-  geom_line(aes(y=Iu,col="Infected_u"))+
-  geom_line(aes(y=Rk,col="Recovered_k"))+
-  geom_line(aes(y=Ru,col="Recovered_u"))+
-  geom_line(aes(y=V,col="Vaccinated"))+
-  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
-  #theme(legend.position = c(0.75,0.4))+
-  labs(y="N",x="Time",col="Population")+
-  #ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
-  theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=2*10^5)+
-  xlim(0,100)+ylim(0,500000)
+
+params.set <- cbind(
+  beta1 = lhs[,1]*(beta1.max-beta1.min)+beta1.min,
+  beta2 = lhs[,2]*(beta2.max-beta2.min)+beta2.min,
+  lambda = lhs[,3]*(lambda.max-lambda.min)+lambda.min,
+  mu = lhs[,4]*(mu.max-mu.min)+mu.min,
+  mu1 = lhs[,5]*(mu1.max-mu1.min)+mu1.min,
+  psi = lhs[,6]*(psi.max-psi.min)+psi.min,
+#  phi = lhs[,6]*(phi.max-phi.min)+phi.min,
+  theta = lhs[,7]*(theta.max-theta.min)+theta.min,
+  alpha = lhs[,8]*(alpha.max-alpha.min)+alpha.min,
+  gamma = lhs[,9]*(gamma.max-gamma.min)+gamma.min)
 ```
 
-```{r, eval=F}
-params<-c(beta1=0.0000003,#transmission rate for known infecteds
-        beta2=0.000003,#transmission rate for unknown infecteds
-        lambda=5,
-        mu=1/1000,
-        mu1=1/10,
-        phi=90/100,#proportion vaccines going to confirmed susceptibles
-        psi=20/100,#proportion of infecteds in known category
-        theta=1,
-        alpha=1/7,
-        gamma=2500)   # model parameters
+```{r}
+levels <- 11
 
-output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+h2 <- 25
 
-output %>% ggplot(.,aes(x=time))+
-  geom_line(aes(y=S,col="Susceptible"))+
-  geom_line(aes(y=E,col="Exposed"))+
-  geom_line(aes(y=Ik,col="Infected_k"))+
-  geom_line(aes(y=Iu,col="Infected_u"))+
-  geom_line(aes(y=Rk,col="Recovered_k"))+
-  geom_line(aes(y=Ru,col="Recovered_u"))+
-  geom_line(aes(y=V,col="Vaccinated"))+
-  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
-  #theme(legend.position = c(0.75,0.4))+
-  labs(y="N",x="Time",col="Population")+
-  #ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
-  theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=2*10^5)+
-  xlim(0,100)+ylim(0,500000)
+antibody.prop <- seq(0,1,0.1)
+j <- 1  
+lhs_data <- data.frame(matrix(rep(NA,levels*h2*11),nrow=levels*h2))
+
+for(i in 1:h2){
+  for (k in 1:length(antibody.prop)){
+    
+    lhs_data[j,1:10] <- params <- as.list(c(params.set[i,], phi=antibody.prop[k]))
+      mat <- matrix(1:9, nrow = 3, ncol = 3)
+      mat[1] = 0
+      mat[2] = (params$beta1)*(params$lambda/params$mu)*(1/(params$theta+params$mu))
+      mat[3] = (params$beta2)*(params$lambda/params$mu)*(1/(params$theta+params$mu))
+      mat[4] = (params$psi*params$theta)/(params$alpha+params$mu1)
+      mat[5] = 0
+      mat[6] = 0
+      mat[7] = ((1-params$psi)*params$theta)/(params$alpha+params$mu1)
+      mat[8] = 0
+      mat[9] = 0
+      R0 <- max(eigen(mat)$values)
+      threshold <- (1-1/R0)*as.numeric(xstart[1])
+    output <- as.data.frame(ode(xstart, times, de, params))
+    output$herd <- output$S<=threshold
+    tmp <- output %>% filter(herd==1)
+    lhs_data[j,11] <- R0
+    lhs_data[j,12] <- tmp$time[1]
+    j <- j+1
+    
+  }
+}
+
+names(lhs_data) <- c(names(params),'R0','threshold.time')
+
+lhs_data %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_boxplot()
+
+lhs_data %>% filter(threshold.time>1) %>% mutate(phi = as.factor(phi)) %>% ggplot(., aes(x=phi, y=threshold.time)) + geom_point()
+
+
+bonferroni.alpha = 0.05/10
+prcc <- pcc(lhs_data[,1:10], lhs_data[,12], nboot=1000, rank=T, conf=1-bonferroni.alpha)
+print(prcc)
 ```
 
-```{r, eval=F}
-params<-c(beta1=0.0000003,#transmission rate for known infecteds
-        beta2=0.000003,#transmission rate for unknown infecteds
-        lambda=5,
-        mu=1/1000,
-        mu1=1/10,
-        phi=90/100,#proportion vaccines going to confirmed susceptibles
-        psi=80/100,#proportion of infecteds in known category
-        theta=1,
-        alpha=1/7,
-        gamma=2500)   # model parameters
-
-output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
-
-output %>% ggplot(.,aes(x=time))+
-  geom_line(aes(y=S,col="Susceptible"))+
-  geom_line(aes(y=E,col="Exposed"))+
-  geom_line(aes(y=Ik,col="Infected_k"))+
-  geom_line(aes(y=Iu,col="Infected_u"))+
-  geom_line(aes(y=Rk,col="Recovered_k"))+
-  geom_line(aes(y=Ru,col="Recovered_u"))+
-  geom_line(aes(y=V,col="Vaccinated"))+
-  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
-  #theme(legend.position = c(0.75,0.4))+
-  labs(y="N",x="Time",col="Population")+
-  #ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
-  theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=2*10^5)+
-  xlim(0,100)+ylim(0,500000)
-```
-
-```{r, eval=F}
-params<-c(beta1=0.0000003,#transmission rate for known infecteds
-        beta2=0.000003,#transmission rate for unknown infecteds
-        lambda=5,
-        mu=1/1000,
-        mu1=1/10,
-        phi=20/100,#proportion vaccines going to confirmed susceptibles
-        psi=20/100,#proportion of infecteds in known category
-        theta=1,
-        alpha=1/7,
-        gamma=2500)   # model parameters
-
-output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
-
-output %>% ggplot(.,aes(x=time))+
-  geom_line(aes(y=S,col="Susceptible"))+
-  geom_line(aes(y=E,col="Exposed"))+
-  geom_line(aes(y=Ik,col="Infected_k"))+
-  geom_line(aes(y=Iu,col="Infected_u"))+
-  geom_line(aes(y=Rk,col="Recovered_k"))+
-  geom_line(aes(y=Ru,col="Recovered_u"))+
-  geom_line(aes(y=V,col="Vaccinated"))+
-  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
-  #theme(legend.position = c(0.75,0.4))+
-  labs(y="N",x="Time",col="Population")+
-  #ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
-  theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=2*10^5)+
-  xlim(0,100)+ylim(0,500000)
-```
-
-```{r, eval=F}
-params<-c(beta1=0.0000003,#transmission rate for known infecteds
-        beta2=0.000003,#transmission rate for unknown infecteds
-        lambda=5,
-        mu=1/1000,
-        mu1=1/10,
-        phi=20/100,#proportion vaccines going to confirmed susceptibles
-        psi=80/100,#proportion of infecteds in known category
-        theta=1,
-        alpha=1/7,
-        gamma=2500)   # model parameters
-
-output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
-
-output %>% ggplot(.,aes(x=time))+
-  geom_line(aes(y=S,col="Susceptible"))+
-  geom_line(aes(y=E,col="Exposed"))+
-  geom_line(aes(y=Ik,col="Infected_k"))+
-  geom_line(aes(y=Iu,col="Infected_u"))+
-  geom_line(aes(y=Rk,col="Recovered_k"))+
-  geom_line(aes(y=Ru,col="Recovered_u"))+
-  geom_line(aes(y=V,col="Vaccinated"))+
-  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
-  #theme(legend.position = c(0.75,0.4))+
-  labs(y="N",x="Time",col="Population")+
-  #ggtitle("Transmission Model for Antibody-Assisted Vaccinations")+
-  theme(plot.title = element_text(hjust=, size=10))+
-  geom_hline(yintercept=2*10^5)+
-  xlim(0,100)+ylim(0,500000)
-```

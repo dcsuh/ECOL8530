@@ -257,7 +257,7 @@ herd %>% ggplot(.,aes(x = phi,y = time)) + geom_line(color="red")
 ```{r}
 #US dec. 14
 psi_list <- c(80,50,20)
-R0_list <- c(1.5,2,2.5)
+R0_list <- c(1.7,2.3,2.7)
 
 K <- 330001060
 
@@ -276,16 +276,18 @@ Rk=K*0.0480,
 Ru=K*0.1972,
 V=K*0.0000)
 
-US_dec <- vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1,xstart, minTime = 0, maxTime = 200)
-US_dec_plots <- vacc_plot(US_dec, ymax=200)
-US_dec_plots[1]
+US_dec <- vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1,xstart, minTime = 0, maxTime = 250)
+US_dec_plots <- vacc_plot_all(US_dec, ymax=250)
+US_dec_plots
+US_dec_plot <- vacc_plot(US_dec, ymax=200, psi_seq=3)
+US_dec_plot + labs(title = "US Dec. 14th start - 80% infections unknown")
 ```
 
 
 ```{r}
 #US jan. 14
 psi_list <- c(80,50,20)
-R0_list <- c(1.5,2,2.5)
+R0_list <- c(1.7,2.3,2.7)
 
 K <- 330047464
 
@@ -304,16 +306,17 @@ Rk=K*0.0667,
 Ru=K*0.2514,
 V=K*0.0939)
 
-US_jan <-vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1,xstart,minTime = 0, maxTime = 200)
-US_jan_plots <- vacc_plot(US_dec, ymax=200)
-US_jan_plots[1]
+US_jan <-vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1,xstart,minTime = 0, maxTime = 250)
+#US_jan_plots <- vacc_plot_all(US_dec, ymax=250)
+US_jan_plot <- vacc_plot(US_dec, ymax=200, psi_seq = 3)
+US_jan_plot + labs(title = "US Jan. 14th start - 80% infections unknown")
 ```
 
 
 ```{r}
 #GA dec. 14
 psi_list <- c(80,50,20)
-R0_list <- c(1.5,2,2.5)
+R0_list <- c(1.7,2.3,2.7)
 
 K <- 10617423
 
@@ -333,15 +336,16 @@ Ru=K*0.1915,
 V=K*0.0000)
 
 GA_dec <- vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1,xstart, minTime = 0, maxTime = 200)
-GA_dec_plots <- vacc_plot(GA_dec, ymax=200)
-GA_dec_plots[1]
+#GA_dec_plots <- vacc_plot_all(GA_dec, ymax=200)
+GA_dec_plot <- vacc_plot(GA_dec, ymax=125, psi_seq=3)
+GA_dec_plot + labs(title = "GA Dec. 14th start - 80% infections unknown")
 ```
 
 
 ```{r}
 #GA jan. 14
 psi_list <- c(80,50,20)
-R0_list <- c(1.5,2,2.5)
+R0_list <- c(1.7,2.3,2.7)
 
 K <- 10617423
 
@@ -361,8 +365,9 @@ Ru=K*0.2532,
 V=K*0.1460)
 
 GA_jan <- vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1,xstart, minTime = 0, maxTime = 200)
-GA_jan_plots <- vacc_plot(GA_jan, ymax=200)
-GA_jan_plots[1]
+#GA_jan_plots <- vacc_plot_all(GA_jan, ymax=200)
+GA_jan_plot <- vacc_plot(GA_jan, ymax=125, psi_seq = 3)
+GA_jan_plot + labs(title = "GA Jan. 14th start - 80% infections unknown")
 ```
 
 
@@ -458,7 +463,15 @@ return(final)
 
 
 ```{r, }
-vacc_plot <- function(final, ymax){
+vacc_plot <- function(final, ymax, psi_seq){
+plot1 <- ggplot() + geom_line(data = final[[psi_seq]][[1]],aes(x=phi, y=time), color="red") +
+  geom_line(data = final[[psi_seq]][[2]],aes(x=phi, y=time),color="forestgreen") +
+  geom_line(data = final[[psi_seq]][[3]],aes(x=phi, y=time),color="blue") + 
+  xlab("phi") + ylab("time") + 
+  ylim(0,ymax)
+  return(plot1)
+}
+vacc_plot_all <- function(final, ymax){
 
 plot1 <- ggplot() + geom_line(data = final[[1]][[1]],aes(x=phi, y=time), color="red") +
   geom_line(data = final[[1]][[2]],aes(x=phi, y=time),color="forestgreen") +
@@ -477,10 +490,12 @@ plot3 <- ggplot() + geom_line(data = final[[3]][[1]],aes(x=phi, y=time), color="
   geom_line(data = final[[3]][[3]],aes(x=phi, y=time),color="blue") + 
   xlab("phi") + ylab("time") + labs(title = "20% symptomatic") + 
   theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y=element_blank(), axis.title.x = element_blank()) + ylim(0,ymax)
-return(list(plot1,plot2,plot3))
-}
+
 final_plot <- plot1|plot2|plot3
-final_plot
+
+return(final_plot)
+}
+
 
 ```
 

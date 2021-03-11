@@ -308,7 +308,7 @@ V=K*0.0939)
 
 US_jan <-vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1,xstart,minTime = 0, maxTime = 250)
 #US_jan_plots <- vacc_plot_all(US_dec, ymax=250)
-US_jan_plot <- vacc_plot(US_dec, ymax=200, psi_seq = 3)
+US_jan_plot <- vacc_plot(US_jan, ymax=200, psi_seq = 3)
 US_jan_plot + labs(title = "US Jan. 14th start - 80% infections unknown")
 ```
 
@@ -336,9 +336,13 @@ Ru=K*0.1915,
 V=K*0.0000)
 
 GA_dec <- vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1,xstart, minTime = 0, maxTime = 200)
-#GA_dec_plots <- vacc_plot_all(GA_dec, ymax=200)
-GA_dec_plot <- vacc_plot(GA_dec, ymax=125, psi_seq=3)
-GA_dec_plot + labs(title = "GA Dec. 14th start - 80% infections unknown")
+GA_dec_beta2_1.5 <- vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1,beta2_mult=1.5,xstart, minTime = 0, maxTime = 200)
+GA_dec_beta1_1.5 <- vaccinate(psi_list,R0_list,K,mu,mu,theta,alpha,gamma,beta1_mult=1.5,beta2_mult=1,xstart, minTime = 0, maxTime = 200)
+
+GA_dec_plots <- vacc_plot_all(GA_dec, ymax=125)
+GA_dec_plots
+#GA_dec_plot <- vacc_plot(GA_dec, ymax=125, psi_seq=3)
+#GA_dec_plot + labs(title = "GA Dec. 14th start - 80% infections unknown")
 ```
 
 
@@ -476,19 +480,19 @@ vacc_plot_all <- function(final, ymax){
 plot1 <- ggplot() + geom_line(data = final[[1]][[1]],aes(x=phi, y=time), color="red") +
   geom_line(data = final[[1]][[2]],aes(x=phi, y=time),color="forestgreen") +
   geom_line(data = final[[1]][[3]],aes(x=phi, y=time),color="blue") + 
-  xlab("phi") + ylab("time") + labs(title = "80% symptomatic") +
+  xlab("phi") + ylab("time") + labs(title = "20% infections unknown") +
   theme(axis.title.x = element_blank()) + ylim(0,ymax)
 
 plot2 <- ggplot() + geom_line(data = final[[2]][[1]],aes(x=phi, y=time), color="red") +
   geom_line(data = final[[2]][[2]],aes(x=phi, y=time),color="forestgreen") +
   geom_line(data = final[[2]][[3]],aes(x=phi, y=time),color="blue") + 
-  xlab("phi") + ylab("time") + labs(title = "50% symptomatic") + 
+  xlab("phi") + ylab("time") + labs(title = "50% infections known") + 
   theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y=element_blank()) + ylim(0,ymax)
 
 plot3 <- ggplot() + geom_line(data = final[[3]][[1]],aes(x=phi, y=time), color="red") +
   geom_line(data = final[[3]][[2]],aes(x=phi, y=time),color="forestgreen") +
   geom_line(data = final[[3]][[3]],aes(x=phi, y=time),color="blue") + 
-  xlab("phi") + ylab("time") + labs(title = "20% symptomatic") + 
+  xlab("phi") + ylab("time") + labs(title = "80% infections unknown") + 
   theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y=element_blank(), axis.title.x = element_blank()) + ylim(0,ymax)
 
 final_plot <- plot1|plot2|plot3
@@ -589,17 +593,24 @@ h <- 1000
 set.seed(8878896)
 lhs <- maximinLHS(h,10)
 
+K <-125000 #values arbitrarily chosen
+R0 <- 2
+mu <- 1/(365*75)
+lambda <- K*mu
+theta <- 1/5
+alpha <- 1/7
+beta <- (R0*alpha)/K
 
 beta1.min=beta/10
 beta1.max=beta*10
 beta2.min=beta/10
 beta2.max=beta*10
-lambda.min=4
-lambda.max=5
-mu.min=1/(365*70)
-mu.max=1/(365*80)
-mu1.min=1/(365*60)
-mu1.max=1/(365*80)
+lambda.min=3
+lambda.max=10
+mu.min=1/(365*80)
+mu.max=1/(365*70)
+mu1.min=1/(365*80)
+mu1.max=1/(365*60)
 phi.min=0
 phi.max=1
 psi.min=0
@@ -608,8 +619,8 @@ theta.min=1/8
 theta.max=1/3
 alpha.min=1/14
 alpha.max=1/5
-gamma.min=K*0.01
-gamma.max=K*0.05
+gamma.min=K*0.001
+gamma.max=K*0.01
 
 
 params.set <- cbind(
@@ -628,7 +639,7 @@ params.set <- cbind(
 ```{r}
 levels <- 11
 
-h2 <- 25
+h2 <- 1000
 
 antibody.prop <- seq(0,1,0.1)
 j <- 1  

@@ -3,7 +3,9 @@
 
 
 #latin hypercube sampling for eqs from eqs_ode.Rmd
-
+library(tidyverse)
+library(magrittr)
+library(deSolve)
 library(lhs)
 library(sensitivity)
 

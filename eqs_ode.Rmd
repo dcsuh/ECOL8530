@@ -71,7 +71,7 @@ $$
 
 
 Grid Search Through Parameters
-```{r, }
+```{r, evaluate=F}
 #Grid search through parameters
 
 K <- 125000
@@ -253,79 +253,6 @@ return(final_plot)
 }
 ```
 
-
-```{r, }
-psi <- c(50)
-R0 <- c(10)
-
-K <- 15000
-mu <- 1/(365*75)
-lambda <- K*mu
-theta <- 1/5
-alpha <- 1/7
-gamma <- K*0.025
-
-xstart <- c(
-S=K*0.7119,
-E=K*0.0107,
-Ik=K*0.0088,
-Iu=K*0.0234,
-Rk=K*0.0480,
-Ru=K*0.1972,
-V=K*0.0000)
-
-    beta <- (R0*(alpha))/K
-
-    psi = psi/100 #proportion individuals in known infected class
-    theta = theta #incubation period
-    alpha = alpha #recovery period
-    mu = mu #per capita mortality rate for uninfected
-    mu1 = mu1 #per capita mortality rate for infected
-    beta1 = beta*1 #transmission rate for symptomatic
-    beta2 = beta*1 #transmission rate for asymptomatic
-    lambda = lambda #constant birth rate
-    dfe =lambda/mu
-  
-    mat <- matrix(1:9, nrow = 3, ncol = 3)
-    
-   
-    mat[1] = 0
-    mat[2] = ((beta1)*(dfe))/(theta+mu)
-    mat[3] = ((beta2)*(dfe))/(theta+mu)
-    mat[4] = (psi*theta)/(alpha+mu1)
-    mat[5] = 0
-    mat[6] = 0
-    mat[7] = ((1-psi)*theta)/(alpha+mu1)
-    mat[8] = 0
-    mat[9] = 0
-    eigen <- max(eigen(mat)$values)
-    
-    threshold <- (1-1/eigen)*K
-    phi <- c(0)
-    time <- c(0)
-    herd <- tibble(phi, time, .rows = 11)
-    for (k in 0:10){
-      params<-c(beta1=beta1,
-                beta2=beta2,
-                lambda=lambda,
-                mu=mu,
-                mu1=mu,
-                phi=k*10/100,
-                psi=psi/100,
-                theta=theta,
-                alpha=alpha,
-                gamma=gamma) 
-
-      output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
-      output$herd <- output$S<=threshold
-      tmp <- output %>% filter(herd==1)
-      herd$phi[k+1] <- as.numeric(params[6])
-      herd$time[k+1] <- tmp$time[1]
-    }
-
-herd %>% ggplot(.,aes(x = phi,y = time)) + geom_line(color="red")
-
-```
 
 ```{r}
 #US dec. 14

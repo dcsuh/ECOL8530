@@ -366,7 +366,7 @@ plot_time_80 <- ggplot() + geom_line(data = GA_dec[[3]][[1]],aes(x=phi, y=time),
 plot_Ru_20 <- ggplot() + geom_line(data = GA_dec[[1]][[1]],aes(x=phi, y=R_u), color="red") +
   geom_line(data = GA_dec[[1]][[2]],aes(x=phi, y=R_u),color="forestgreen") +
   geom_line(data = GA_dec[[1]][[3]],aes(x=phi, y=R_u),color="blue") + 
-  xlab("phi") + ylab("Ru") + labs(title = "phi = 80%") +
+  xlab("phi") + ylab("Ru") + labs(title = "psi = 80%") +
   theme() + ylim(1750000,4000000)
 
 plot_Ru_80 <- ggplot() + geom_line(data = GA_dec[[3]][[1]],aes(x=phi, y=R_u), color="red") +
@@ -396,7 +396,7 @@ plot_time_80 <- ggplot() + geom_line(data = GA_dec_beta1_1.5[[3]][[1]],aes(x=phi
 plot_Ru_20 <- ggplot() + geom_line(data = GA_dec_beta1_1.5[[1]][[1]],aes(x=phi, y=R_u), color="red") +
   geom_line(data = GA_dec_beta1_1.5[[1]][[2]],aes(x=phi, y=R_u),color="forestgreen") +
   geom_line(data = GA_dec_beta1_1.5[[1]][[3]],aes(x=phi, y=R_u),color="blue") + 
-  xlab("phi") + ylab("Ru") + labs(title = "phi = 80%") +
+  xlab("phi") + ylab("Ru") + labs(title = "psi = 80%") +
   theme() + ylim(2250000,4000000)
 
 plot_Ru_80 <- ggplot() + geom_line(data = GA_dec_beta1_1.5[[3]][[1]],aes(x=phi, y=R_u), color="red") +
@@ -448,18 +448,23 @@ all_plots <- p_a |p_b | p_c | p_d
 
 
 Plots for transmission Dynamics
-Keep psi the same but change phi with high R0 (1.7)
+Keep psi the same but change phi with R0 <- 1.64
 ```{r, }
 
 K <- 10617423
 
 mu <- 1/(365*75)
+mu1 <- mu
 lambda <- K*mu
 theta <- 1/5
 alpha <- 1/7
 gamma <- K*0.004709
-R0 <- 1.7
+R0 <- 2.7
 beta <- (R0*(alpha))/K
+beta1 <- beta
+beta2 <- beta
+psi <- 0.2
+dfe <- lambda/mu
 
 mat <- matrix(1:9, nrow = 3, ncol = 3)
 
@@ -493,16 +498,19 @@ params<-c(beta1=beta,
           mu=mu,
           mu1=mu,
           phi=0/100,
-          psi=80/100,
+          psi=20/100,
           theta=theta,
           alpha=alpha,
           gamma=gamma) 
 
-times<-seq(0,100,by=0.1)
+times<-seq(0,200,by=0.1)
 
 
 
 output<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+
+herd1 <- output %>% filter(S<threshold)
+p1_time <- herd1$time[1]
 
 p1 <- output %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=S,col="Susceptible"))+
@@ -512,11 +520,14 @@ p1 <- output %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=Rk,col="Recovered_k"))+
   geom_line(aes(y=Ru,col="Recovered_u"))+
   geom_line(aes(y=V,col="Vaccinated"))+
-  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
+  scale_colour_manual(values = c("red","orange","hotpink","forestgreen","blue","purple","dimgray","black"))+
   theme(legend.position = "none")+
   labs(y="N",x="Time",col="Population")+
   ggtitle("Vaccinations without Ab testing (i.e. phi = 0)")+
-  geom_hline(yintercept=threshold)
+  geom_hline(yintercept=threshold, linetype="dashed") + 
+  geom_vline(xintercept=p1_time, color="red", linetype="dotted") +
+  xlim(0,50)+
+  ylim(0,K*0.75) + theme_minimal()
 
 params<-c(beta1=beta,
           beta2=beta,
@@ -524,12 +535,15 @@ params<-c(beta1=beta,
           mu=mu,
           mu1=mu,
           phi=100/100,
-          psi=80/100,
+          psi=20/100,
           theta=theta,
           alpha=alpha,
           gamma=gamma) 
 
 output1<-as.data.frame(lsoda(xstart,times,de,params)) # tells computer to solve (integrate) equations
+
+herd2 <- output1 %>% filter(S<threshold)
+p2_time <- herd2$time[1]
 
 p2 <- output1 %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=S,col="Susceptible"))+
@@ -539,10 +553,13 @@ p2 <- output1 %>% ggplot(.,aes(x=time))+
   geom_line(aes(y=Rk,col="Recovered_k"))+
   geom_line(aes(y=Ru,col="Recovered_u"))+
   geom_line(aes(y=V,col="Vaccinated"))+
-  scale_colour_manual(values = c("red","orange","hotpink","green","blue","purple","gray","black"))+
+  scale_colour_manual(values = c("red","orange","hotpink","forestgreen","blue","purple","dimgray","black"))+
   labs(y="N",x="Time",col="Population")+
   ggtitle("Vaccinations with Ab testing (i.e. phi = 1)")+
-  geom_hline(yintercept=threshold)
+  geom_hline(yintercept=threshold,linetype="dashed") +  
+  geom_vline(xintercept=p2_time, color="red", linetype="dotted") +
+  xlim(0,50)+
+  ylim(0,K*0.75) + theme_minimal()
 
 pf <- p1/p2
 ```
